@@ -1,0 +1,14 @@
+volumes:
+  pg_data: {}
+
+services:
+  db:
+    image: postgres:17
+    ports:
+      - 45432:5432
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=play_with_gql
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password

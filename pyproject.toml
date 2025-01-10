@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "play-with-gql"
+version = "0.1.0"
+description = ""
+authors = ["Sanghyuk Jeong <jade@indentcorp.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+django = "^5.1.4"
+strawberry-graphql-django = "^0.53.3"
+django-choices-field = "^2.3.0"
+psycopg2 = "^2.9.10"
+django-stubs = {version = "^5.1.1", extras = ["compatible-mypy"]}
+ruff = "^0.9.0"
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "play_with_gql.settings"
+
+
+[tool.ruff]
+line-length = 119
+target-version = "py312"
+lint.select = ["PLE", "PLW", "E", "W", "F", "I", "Q", "UP", "C4", "PT"]
+exclude = ["migrations"]
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
