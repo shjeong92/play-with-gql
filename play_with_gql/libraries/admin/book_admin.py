@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from play_with_gql.library.models import Book
+from play_with_gql.libraries.models import Book
 
 
 @admin.register(Book)

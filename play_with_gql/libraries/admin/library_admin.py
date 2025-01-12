@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from play_with_gql.library.models import Library
+from play_with_gql.libraries.models import Library
 
 
 @admin.register(Library)
