@@ -1,10 +1,10 @@
 import strawberry
 
-from play_with_gql.api.libraries.queries import GetNodeQuery
+from play_with_gql.api.libraries.queries import GetLibraryQuery, GetNodeQuery
 
 
 @strawberry.type
-class Query(GetNodeQuery):
+class Query(GetNodeQuery, GetLibraryQuery):
     pass
 
 

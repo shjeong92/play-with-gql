@@ -2,12 +2,17 @@ import base64
 from typing import Any
 
 import pytest
+from asgiref.sync import sync_to_async
 from django.db.models import Model
+from django.test.client import AsyncClient
+from factory.fuzzy import FuzzyText
 
 from play_with_gql.libraries.models.author import Author
 from play_with_gql.libraries.models.book import Book
+from play_with_gql.libraries.models.librarian import Librarian
 from play_with_gql.libraries.models.library import Library
 from play_with_gql.schema import schema
+from play_with_gql.users.models import User
 
 
 @pytest.fixture
@@ -199,3 +204,161 @@ def test_introspection_query():
 
     for type_name in expected_types:
         assert type_name in type_names
+
+
+@pytest.mark.django_db
+@pytest.mark.asyncio
+async def test_me_query_with_auth(admin_user):
+    admin_user = await sync_to_async(User.objects.create_superuser)(
+        username=FuzzyText().fuzz(), email="bdmin@example.com", password="password123"
+    )
+    client = AsyncClient()
+    await client.aforce_login(admin_user)
+    query = """
+    query {
+      me
+    }
+    """
+
+    response = await client.post("/graphql/", {"query": query}, content_type="application/json")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["data"]["me"] == admin_user.username
+
+
+@pytest.mark.django_db
+@pytest.mark.asyncio
+async def test_me_query_without_auth():
+    client = AsyncClient()
+    query = """
+    query {
+      me
+    }
+    """
+
+    response = await client.post("/graphql/", {"query": query}, content_type="application/json")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["data"]["me"] is None
+
+
+@pytest.mark.django_db
+@pytest.mark.asyncio
+async def test_me_query_with_invalid_session():
+    client = AsyncClient()
+    query = """
+    query {
+      me
+    }
+    """
+
+    # 잘못된 세션 ID로 요청
+    response = await client.post(
+        "/graphql/", {"query": query}, content_type="application/json", HTTP_COOKIE="sessionid=invalid_session_id"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["data"]["me"] is None
+
+
+@pytest.mark.django_db
+@pytest.mark.asyncio
+async def test_get_library_with_librarian_permission():
+    # 테스트 데이터 생성
+    library = await sync_to_async(Library.objects.create)(name="Test Library")
+    user = await sync_to_async(User.objects.create_user)(
+        username=FuzzyText().fuzz(), email="librarian@example.com", password="password123"
+    )
+
+    # Librarian 생성
+    await sync_to_async(Librarian.objects.create)(user=user, library=library)
+
+    # 로그인
+    client = AsyncClient()
+    await client.aforce_login(user)
+
+    query = """
+    query GetLibrary($nodeId: String!) {
+      library(nodeId: $nodeId) {
+        name
+      }
+    }
+    """
+
+    variables = {"nodeId": to_global_id(library)}
+
+    response = await client.post(
+        "/graphql/", {"query": query, "variables": variables}, content_type="application/json"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("errors") is None
+    assert data["data"]["library"]["name"] == library.name
+
+
+@pytest.mark.django_db
+@pytest.mark.asyncio
+async def test_get_library_without_librarian_permission():
+    # 일반 사용자 생성
+    library = await sync_to_async(Library.objects.create)(name="Test Library")
+    user = await sync_to_async(User.objects.create_user)(
+        username=FuzzyText().fuzz(), email="user@example.com", password="password123"
+    )
+
+    # 로그인
+    client = AsyncClient()
+    await client.aforce_login(user)
+
+    query = """
+    query GetLibrary($nodeId: String!) {
+      library(nodeId: $nodeId) {
+        id
+        name
+      }
+    }
+    """
+
+    variables = {"nodeId": to_global_id(library)}
+
+    response = await client.post(
+        "/graphql/", {"query": query, "variables": variables}, content_type="application/json"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("errors") is not None  # 권한 에러가 발생해야 함
+    assert "errors" in data
+    assert any("Forbidden" in error.get("message", "") for error in data["errors"])
+
+
+@pytest.mark.django_db
+@pytest.mark.asyncio
+async def test_get_library_without_auth():
+    # 인증되지 않은 사용자 테스트
+    library = await sync_to_async(Library.objects.create)(name="Test Library")
+    client = AsyncClient()
+
+    query = """
+    query GetLibrary($nodeId: String!) {
+      library(nodeId: $nodeId) {
+        id
+        name
+      }
+    }
+    """
+
+    variables = {"nodeId": to_global_id(library)}
+
+    response = await client.post(
+        "/graphql/", {"query": query, "variables": variables}, content_type="application/json"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("errors") is not None  # 인증 에러가 발생해야 함
+    assert "errors" in data
+    assert any("Unauthenticated" in error.get("message", "") for error in data["errors"])
