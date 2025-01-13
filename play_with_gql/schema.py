@@ -1,11 +1,11 @@
 import strawberry
 
 from play_with_gql.api.libraries.mutations import DeleteBookMutation, UpdateBookMutation
-from play_with_gql.api.libraries.queries import GetLibraryQuery, GetNodeQuery
+from play_with_gql.api.libraries.queries import GetBooksQuery, GetLibraryQuery, GetNodeQuery
 
 
 @strawberry.type
-class Query(GetNodeQuery, GetLibraryQuery):
+class Query(GetNodeQuery, GetLibraryQuery, GetBooksQuery):
     pass
 
 

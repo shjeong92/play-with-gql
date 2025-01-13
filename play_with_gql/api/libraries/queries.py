@@ -2,11 +2,13 @@ import base64
 from typing import Any
 
 import strawberry
-from strawberry import relay
+import strawberry_django
+from strawberry import auto, relay
 from strawberry.types import Info
 
-from play_with_gql.api.libraries.nodes import LibraryNode
+from play_with_gql.api.libraries.nodes import BookNode, LibraryNode
 from play_with_gql.api.libraries.permissions import IsAuthenticated, IsLibrarian
+from play_with_gql.libraries.models.book import Book
 from play_with_gql.libraries.models.library import Library
 
 
@@ -35,3 +37,13 @@ class GetLibraryQuery:
             return library
         except (ValueError, IndexError):
             raise ValueError("Invalid library ID format")
+
+
+@strawberry_django.filter(Book, lookups=True)
+class BookFilter:
+    title: auto
+
+
+@strawberry.type
+class GetBooksQuery:
+    books: list[BookNode] = strawberry_django.field(filters=BookFilter)

@@ -475,3 +475,80 @@ def test_delete_book_with_invalid_id():
     assert result.errors is not None
     assert len(result.errors) > 0
     assert "Book matching query does not exist" in str(result.errors[0])
+
+
+@pytest.mark.django_db
+def test_get_books_filtered_by_title_icontains(library: Library, author: Author):
+    # 테스트용 책들 생성
+    Book.objects.create(title="Python Programming", author=author, library=library, published_date="2024-01-01")
+    Book.objects.create(title="Python Web Development", author=author, library=library, published_date="2024-01-01")
+    Book.objects.create(title="Java Programming", author=author, library=library, published_date="2024-01-01")
+
+    query = """
+    query GetBooksByTitle($title: String!) {
+      books(filters: { title: { iContains: $title } }) {
+        id
+        title
+        publishedDate
+        author {
+          name
+        }
+      }
+    }
+    """
+
+    # "Python"이 포함된 책들 검색
+    variables = {"title": "Python"}
+    result = execute_query(query, variables)
+
+    assert result.errors is None
+    books = result.data["books"]
+    assert len(books) == 2  # "Python"이 포함된 책 2개
+    assert all("Python" in book["title"] for book in books)
+
+
+@pytest.mark.django_db
+def test_get_books_with_exact_title(library: Library, author: Author):
+    # 테스트용 책들 생성
+    Book.objects.create(title="Python Programming", author=author, library=library, published_date="2024-01-01")
+    Book.objects.create(title="Python Programming Guide", author=author, library=library, published_date="2024-01-01")
+
+    query = """
+    query GetBooksByExactTitle($title: String!) {
+      books(filters: { title: { exact: $title } }) {
+        id
+        title
+      }
+    }
+    """
+
+    variables = {"title": "Python Programming"}
+    result = execute_query(query, variables)
+
+    assert result.errors is None
+    books = result.data["books"]
+    assert len(books) == 1
+    assert books[0]["title"] == "Python Programming"
+
+
+@pytest.mark.django_db
+def test_get_books_with_no_matches(library: Library, author: Author):
+    # 테스트용 책들 생성
+    Book.objects.create(title="Python Programming", author=author, library=library, published_date="2024-01-01")
+    Book.objects.create(title="Java Programming", author=author, library=library, published_date="2024-01-01")
+
+    query = """
+    query GetBooksByTitle($title: String!) {
+      books(filters: { title: { iContains: $title } }) {
+        id
+        title
+      }
+    }
+    """
+
+    variables = {"title": "Ruby"}
+    result = execute_query(query, variables)
+
+    assert result.errors is None
+    books = result.data["books"]
+    assert len(books) == 0  # 매칭되는 책이 없어야 함
