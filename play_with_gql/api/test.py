@@ -362,3 +362,116 @@ async def test_get_library_without_auth():
     assert data.get("errors") is not None  # 인증 에러가 발생해야 함
     assert "errors" in data
     assert any("Unauthenticated" in error.get("message", "") for error in data["errors"])
+
+
+@pytest.mark.django_db
+def test_update_book_mutation(book: Book):
+    query = """
+    mutation UpdateBook($id: GlobalID!, $title: String) {
+      updateBook(id: $id, title: $title) {
+        id
+        title
+        publishedDate
+      }
+    }
+    """
+
+    variables = {"id": to_global_id(book), "title": "Updated Book Title"}
+
+    result = execute_query(query, variables)
+
+    assert result.errors is None
+    data = result.data["updateBook"]
+    assert data["title"] == "Updated Book Title"
+
+    # DB에서 실제로 업데이트되었는지 확인
+    updated_book = Book.objects.get(id=book.id)
+    assert updated_book.title == "Updated Book Title"
+
+
+@pytest.mark.django_db
+def test_update_book_partial_mutation(book: Book):
+    query = """
+    mutation UpdateBook($id: GlobalID!, $title: String) {
+      updateBook(id: $id, title: $title) {
+        id
+        title
+        publishedDate
+      }
+    }
+    """
+
+    variables = {"id": to_global_id(book), "title": "Only Title Updated"}
+
+    result = execute_query(query, variables)
+
+    assert result.errors is None
+    data = result.data["updateBook"]
+    assert data["title"] == "Only Title Updated"
+    assert data["publishedDate"] == "2024-01-01"  # 원래 날짜가 유지되어야 함
+
+    # DB에서 실제로 업데이트되었는지 확인
+    updated_book = Book.objects.get(id=book.id)
+    assert updated_book.title == "Only Title Updated"
+    assert str(updated_book.published_date) == "2024-01-01"
+
+
+@pytest.mark.django_db
+def test_delete_book_mutation(book: Book):
+    query = """
+    mutation DeleteBook($id: GlobalID!) {
+      deleteBook(id: $id)
+    }
+    """
+
+    variables = {"id": to_global_id(book)}
+
+    result = execute_query(query, variables)
+
+    assert result.errors is None
+    assert result.data["deleteBook"] is True
+
+    # DB에서 실제로 삭제되었는지 확인
+    assert not Book.objects.filter(id=book.id).exists()
+
+
+@pytest.mark.django_db
+def test_update_book_with_invalid_id():
+    query = """
+    mutation UpdateBook($id: GlobalID!, $title: String) {
+      updateBook(id: $id, title: $title) {
+        id
+        title
+      }
+    }
+    """
+
+    variables = {
+        "id": to_global_id(Book(id=99999)),  # 존재하지 않는 ID
+        "title": "This Should Fail",
+    }
+
+    result = execute_query(query, variables)
+
+    assert result.errors is not None
+    assert len(result.errors) > 0
+    assert "Book matching query does not exist" in str(result.errors[0])
+
+
+@pytest.mark.django_db
+def test_delete_book_with_invalid_id():
+    query = """
+    mutation DeleteBook($id: GlobalID!) {
+      deleteBook(id: $id)
+    }
+    """
+
+    variables = {
+        "id": to_global_id(Book(id=99999))  # 존재하지 않는 ID
+    }
+
+    result = execute_query(query, variables)
+
+    assert result.errors is not None
+    assert len(result.errors) > 0
+    assert "Book matching query does not exist" in str(result.errors[0])
